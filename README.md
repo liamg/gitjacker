@@ -1,2 +1,2 @@
 # gitjacker
-Steal git repositories backing misconfigured public websites
+Steal source git repositories from misconfigured websites
