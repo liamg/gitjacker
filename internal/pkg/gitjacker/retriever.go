@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -28,7 +29,7 @@ var paths = []string{
 	"info/exclude",
 }
 
-var ErrNotVulnerable = fmt.Errorf("no .git directory is hosted at this URL")
+var ErrNotVulnerable = fmt.Errorf("no .git directory is available at this URL")
 
 type retriever struct {
 	baseURL    *url.URL
@@ -47,16 +48,26 @@ func New(target *url.URL, outputDir string) *retriever {
 		outputDir: outputDir,
 		http: &http.Client{
 			Timeout: time.Second * 10,
-			CheckRedirect: func(req *http.Request, via []*http.Request) error {
-				return http.ErrUseLastResponse
-			},
 		},
 		downloaded: make(map[string]bool),
 	}
 }
 
 func (r *retriever) checkVulnerable() error {
-	return r.downloadFile("HEAD")
+	if err := r.downloadFile("HEAD"); err != nil {
+		return err
+	}
+
+	head, err := ioutil.ReadFile(filepath.Join(r.outputDir, ".git", "HEAD"))
+	if err != nil {
+		return err
+	}
+
+	if !strings.HasPrefix(string(head), "ref: ") {
+		return ErrNotVulnerable
+	}
+
+	return nil
 }
 
 func (r *retriever) downloadFile(path string) error {
