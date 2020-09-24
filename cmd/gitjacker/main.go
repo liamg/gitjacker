@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"net/url"
 	"os"
+	"os/exec"
 	"strings"
 
 	"github.com/liamg/gitjacker/internal/pkg/gitjacker"
@@ -50,6 +51,14 @@ More information at https://github.com/liamg/gitjacker`,
 				return err
 			}
 		}
+
+		versionData, err := exec.Command("git", "--version").Output()
+		if err != nil {
+			return fmt.Errorf("failed to start git: %w - please check it is installed", err)
+		}
+
+		version := strings.Split(string(versionData), " ")
+		_ = version // TODO output this
 
 		if err := gitjacker.New(u, outputDir).Run(); err != nil {
 			return err
