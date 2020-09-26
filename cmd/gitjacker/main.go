@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/url"
@@ -36,7 +37,7 @@ var rootCmd = &cobra.Command{
 	Long: `Gitjacker steals git repositories from websites which mistakenly host the contents of the .git directory.
 More information at https://github.com/liamg/gitjacker`,
 	Args: cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
+	Run: func(cmd *cobra.Command, args []string) {
 
 		_ = tml.Printf(`<red>
  ██████  ██ ████████   ██  █████   ██████ ██   ██ ███████ ██████  
@@ -53,23 +54,23 @@ https://github.com/liamg/gitjacker                      %9s
 
 		u, err := url.Parse(rawURL)
 		if err != nil {
-			return fmt.Errorf("invalid url: %w", err)
+			fail("Invalid url: %s", err)
 		}
 
 		if !u.IsAbs() {
-			return fmt.Errorf("invalid url: must be absolute")
+			fail("Invalid url: must be absolute e.g. https://victim.website/")
 		}
 
 		if outputDir == "" {
 			outputDir, err = ioutil.TempDir(os.TempDir(), "gitjacker")
 			if err != nil {
-				return err
+				fail("Failed to create temporary directory: %s", err)
 			}
 		}
 
 		versionData, err := exec.Command("git", "--version").Output()
 		if err != nil {
-			return fmt.Errorf("failed to start git: %w - please check it is installed", err)
+			fail("Cannot check git version: %s - please check it is installed", err)
 		}
 		versionParts := strings.Split(string(versionData), " ")
 		version := strings.TrimSpace(versionParts[len(versionParts)-1])
@@ -78,7 +79,7 @@ https://github.com/liamg/gitjacker                      %9s
 			logrus.SetLevel(logrus.DebugLevel)
 		}
 
-		tml.Printf(`
+		_ = tml.Printf(`
 Target:     <yellow>%s</yellow>
 Local Git:  %s
 Output Dir: %s
@@ -93,7 +94,10 @@ Output Dir: %s
 			if !verbose {
 				fmt.Printf("\x1b[2K\r")
 			}
-			return err
+			if errors.Is(err, gitjacker.ErrNotVulnerable) {
+				fail("The provided URL does not appear vulnerable.\n\nError: %s", err)
+			}
+			fail("Gitjacking failed: %s", err)
 		}
 
 		if !verbose {
@@ -139,7 +143,10 @@ You can find the retrieved repository data in <blue>%s</blue>
 			branchStr,
 			summary.OutputDirectory,
 		)
-
-		return nil
 	},
+}
+
+func fail(format string, args ...interface{}) {
+	_, _ = fmt.Fprintln(os.Stderr, tml.Sprintf("<red>%s", fmt.Sprintf(format, args...)))
+	os.Exit(1)
 }

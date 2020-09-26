@@ -112,7 +112,7 @@ func TestRetrieval(t *testing.T) {
 		}
 	}()
 
-	if err := New(target, outputDir).Run(); err != nil {
+	if _, err := New(target, outputDir).Run(); err != nil {
 		t.Fatal(err)
 	}
 

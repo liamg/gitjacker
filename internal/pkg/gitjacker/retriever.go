@@ -375,12 +375,12 @@ func (r *retriever) Run() (*Summary, error) {
 	// grab packed files
 	if err := r.handlePackFiles(); err == ErrNoPackInfo {
 		r.summary.PackInformationAvailable = false
-		logrus.Debug("Pack information file is not available - some objects may be missing.")
+		logrus.Debugf("Pack information file is not available - some objects may be missing.")
 	} else if err == nil {
 		r.summary.PackInformationAvailable = true
 	} else { // if there's a different error, ignore it, we can continue without unpacking
 		r.summary.PackInformationAvailable = true
-		logrus.Debug("Error in unpack operation: %s", err)
+		logrus.Debugf("Error in unpack operation: %s", err)
 	}
 	if len(r.summary.FoundObjects) == 0 {
 		r.summary.Status = StatusFailure
