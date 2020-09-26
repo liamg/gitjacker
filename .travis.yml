@@ -1,0 +1,27 @@
+language: go
+go:
+  - 1.15
+env:
+  global:
+    - secure: "cmShOYuHjWU915Jp95Cr+rK1BKZXYTcX9BN8VS1cVugdKg/lH5JZTkm26vL+aNBGzjUHx7e88Sx5cSUB4ysBnu5CsUUS1lytVI2xO3cZ599iujnA6YqtYItmrQwV+LeFKqK0P6/gKLskb2Pwzt1NQDFdGMUJs/A2Ao7kN8VkozFsnUohUuQkuBr/afQjlVxLRIZlR5LFbbLPFhMU6i1RddAMcOvVh3SsQBPAVqmtSz0hH2WXMRgTdWoref1T4ecFK+dpuY/ajSfA3RqnycFFo6y2AAI09VB031Mq40O8ey5QxC3Hvxxu0F9BSUH3Xnt6ha2tVsBGOTte8RvHVLLRAnVmrRDkXB3wtfSq+x5ijrxMOXnbEXwB4pPFBac21sJAFNJRHt+L+2Al2P2BlDv8iCHEe0/ieN3et1weQUbCN/2+Rg+qobV/espPh8iYe1bPfAHg/Ia3Wok+A48JtuvkpqsB2LCqGqb5hft9rbNROJ8a8cPoRKC28n4s74JkkMHJDFb43Ygd8LQ/sM/mJw9z37SMjpwF/kypUqBsZ4yKbPJwFCoq0180ykCvdds16hS9wDb89uvY6A5Pv2LuTbmRRgJInDI+AUgclrHbj9gaxyv+ic5rod9GDNIKDddNSMWjdL+p0jtz68SzbF/WKl1yGHk2MmDa/C875Yi7J8D8fdQ="
+jobs:
+  include:
+    - stage: test
+      name: Run tests
+      script:
+        - make test
+    - stage: build
+      script:
+        - make build
+      deploy:
+        provider: releases
+        skip_cleanup: true
+        name: "$TRAVIS_TAG"
+        edge: true
+        file:
+          - bin/darwin/gitjacker-darwin-amd64
+          - bin/linux/gitjacker-linux-amd64
+          - bin/windows/gitjacker-windows-amd64.exe
+        on:
+          repo: liamg/gitjacker
+          tags: true
