@@ -51,12 +51,8 @@ func (v *vulnerableServer) Addr() string {
 }
 
 func (v *vulnerableServer) Close() error {
-	if os.Getenv("TEST_DEBUG") != "" {
-		fmt.Printf("Input: %s\n", v.dir)
-	} else {
-		if err := os.RemoveAll(v.dir); err != nil {
-			return err
-		}
+	if err := os.RemoveAll(v.dir); err != nil {
+		return err
 	}
 	return v.server.Close()
 }
@@ -104,13 +100,7 @@ func TestRetrieval(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() {
-		if os.Getenv("TEST_DEBUG") != "" {
-			fmt.Printf("Output: %s\n", outputDir)
-		} else {
-			_ = os.RemoveAll(outputDir)
-		}
-	}()
+	defer func() { _ = os.RemoveAll(outputDir) }()
 
 	if _, err := New(target, outputDir).Run(); err != nil {
 		t.Fatal(err)
