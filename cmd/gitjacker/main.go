@@ -114,12 +114,36 @@ Output Dir: %s
 
 		var remoteStr string
 		for _, remote := range summary.Config.Remotes {
-			remoteStr = fmt.Sprintf("%s\n  - %s: %s", remoteStr, remote.Name, remote.URL)
+			remoteStr = tml.Sprintf("%s\n  - %s: <bold>%s", remoteStr, remote.Name, remote.URL)
+		}
+		if len(summary.Config.Remotes) == 0 {
+			remoteStr = "n/a"
 		}
 
 		var branchStr string
 		for _, branch := range summary.Config.Branches {
-			branchStr = fmt.Sprintf("%s\n  - %s (%s)", branchStr, branch.Name, branch.Remote)
+			branchStr = tml.Sprintf("%s\n  - %s (%s)", branchStr, branch.Name, branch.Remote)
+		}
+		if len(summary.Config.Branches) == 0 {
+			branchStr = "n/a"
+		}
+
+		var userStr string
+		if summary.Config.User.Name != "" {
+			userStr = tml.Sprintf("%s\n  - Name:         %s", userStr, summary.Config.User.Name)
+		}
+		if summary.Config.User.Username != "" {
+			userStr = tml.Sprintf("%s\n  - Username:     <bold>%s", userStr, summary.Config.User.Username)
+		}
+		if summary.Config.User.Email != "" {
+			userStr = tml.Sprintf("%s\n  - Email:        <bold>%s", userStr, summary.Config.User.Email)
+		}
+		if summary.Config.GithubToken.Token != "" {
+			userStr = tml.Sprintf("%s\n  - GitHub Token: %s:<bold>%s", userStr, summary.Config.GithubToken.Username, summary.Config.GithubToken.Token)
+		}
+
+		if userStr == "" {
+			userStr = "n/a"
 		}
 
 		_ = tml.Printf(`
@@ -130,8 +154,9 @@ Pack Data Listed:  %t
 Repository:        %s
 Remotes:           %s
 Branches:          %s
+User Info:         %s
 
-You can find the retrieved repository data in <blue>%s</blue>
+You can find the retrieved repository data in <blue><bold>%s</bold></blue>
 
 `,
 			status,
@@ -141,6 +166,7 @@ You can find the retrieved repository data in <blue>%s</blue>
 			summary.Config.RepositoryName,
 			remoteStr,
 			branchStr,
+			userStr,
 			summary.OutputDirectory,
 		)
 	},
