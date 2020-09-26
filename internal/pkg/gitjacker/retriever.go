@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -106,9 +107,14 @@ func New(target *url.URL, outputDir string) *retriever {
 }
 
 func (r *retriever) checkVulnerable() error {
-	head, err := r.downloadFile("HEAD")
-	if err != nil {
+	if err := r.downloadFile("HEAD"); err != nil {
 		return fmt.Errorf("%w: %s", ErrNotVulnerable, err)
+	}
+
+	filePath := filepath.Join(r.outputDir, ".git", "HEAD")
+	head, err := ioutil.ReadFile(filePath)
+	if err != nil {
+		return err
 	}
 
 	if !strings.HasPrefix(string(head), "ref: ") {
@@ -118,70 +124,117 @@ func (r *retriever) checkVulnerable() error {
 	return nil
 }
 
-func (r *retriever) downloadFile(path string) ([]byte, error) {
+func (r *retriever) parsePackMetadata(meta []byte) error {
+	lines := strings.Split(string(meta), "\n")
+	for _, line := range lines {
+		parts := strings.Split(strings.TrimSpace(line), " ")
+		if parts[0] == "P" && len(parts) == 2 {
+			if err := r.downloadFile(fmt.Sprintf("objects/pack/%s", parts[1])); err != nil {
+				logrus.Debugf("Failed to retrieve pack file %s: %s", parts[1], err)
+			}
+		}
+	}
+	return nil
+}
+
+func (r *retriever) parsePackFile(filename string, data []byte) error {
+
+	f, err := os.Open(filepath.Join(r.outputDir, ".git", filename))
+	if err != nil {
+		return err
+	}
+	defer func() { _ = f.Close() }()
+
+	cmd := exec.Command("git", "unpack-objects")
+	cmd.Stdin = f
+	cmd.Dir = r.outputDir
+	return cmd.Run()
+}
+
+func (r *retriever) downloadFile(path string) error {
 
 	path = strings.TrimSpace(path)
 
 	filePath := filepath.Join(r.outputDir, ".git", path)
 
 	if r.downloaded[path] {
-		return ioutil.ReadFile(filePath)
+		return nil
 	}
 	r.downloaded[path] = true
 
 	relative, err := url.Parse(path)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	absolute := r.baseURL.ResolveReference(relative)
 	resp, err := r.http.Get(absolute.String())
 	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve %s: %w", absolute.String(), err)
+		return fmt.Errorf("failed to retrieve %s: %w", absolute.String(), err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status code for url %s : %d", absolute.String(), resp.StatusCode)
+		return fmt.Errorf("unexpected status code for url %s : %d", absolute.String(), resp.StatusCode)
 	}
 
 	content, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	if err := os.MkdirAll(filepath.Dir(filePath), 0755); err != nil {
-		return nil, err
+		return err
 	}
 
-	if err := ioutil.WriteFile(filePath, content, 0640); err != nil {
-		return nil, fmt.Errorf("failed to write %s: %w", filePath, err)
-	}
-
-	if path == "HEAD" {
-		ref := strings.TrimPrefix(string(content), "ref: ")
-		if _, err := r.downloadFile(ref); err != nil {
-			return nil, err
+	if !strings.HasSuffix(path, "/") {
+		if err := ioutil.WriteFile(filePath, content, 0640); err != nil {
+			return fmt.Errorf("failed to write %s: %w", filePath, err)
 		}
-		return content, nil
 	}
 
-	if path == "config" {
-		return content, r.analyseConfig(content)
+	switch path {
+	case "HEAD":
+		ref := strings.TrimPrefix(string(content), "ref: ")
+		if err := r.downloadFile(ref); err != nil {
+			return err
+		}
+		return nil
+	case "config":
+		return r.analyseConfig(content)
+	case "objects/pack/":
+		// parse the directory listing
+		packFiles := packLinkRegex.FindAllStringSubmatch(string(content), -1)
+		for _, packFile := range packFiles {
+			if len(packFile) <= 1 {
+				continue
+			}
+			if err := r.downloadFile(fmt.Sprintf("objects/pack/%s", packFile[1])); err != nil {
+				logrus.Debugf("Failed to retrieve pack file %s: %s", packFile[1], err)
+				continue
+			}
+		}
+		return nil
+	case "objects/info/packs":
+		return r.parsePackMetadata(content)
+	}
+
+	if strings.HasSuffix(path, ".pack") {
+		return r.parsePackFile(path, content)
 	}
 
 	if strings.HasPrefix(path, "refs/heads/") {
 		if _, err := r.downloadObject(string(content)); err != nil {
-			return nil, err
+			return err
 		}
-		return content, nil
+		return nil
 	}
 
 	hash := filepath.Base(filepath.Dir(path)) + filepath.Base(path)
 
 	objectType, err := r.getObjectType(hash)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	switch objectType {
@@ -189,7 +242,7 @@ func (r *retriever) downloadFile(path string) ([]byte, error) {
 
 		commit, err := r.readCommit(hash)
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		logrus.Debugf("Successfully retrieved commit %s.", hash)
@@ -209,7 +262,7 @@ func (r *retriever) downloadFile(path string) ([]byte, error) {
 
 		tree, err := r.readTree(hash)
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		logrus.Debugf("Successfully retrieved tree %s.", hash)
@@ -222,10 +275,10 @@ func (r *retriever) downloadFile(path string) ([]byte, error) {
 	case GitBlobFile:
 		logrus.Debugf("Successfully retrieved blob %s.", hash)
 	default:
-		return nil, fmt.Errorf("unknown git file type for %s: %s", path, objectType)
+		return fmt.Errorf("unknown git file type for %s: %s", path, objectType)
 	}
 
-	return content, nil
+	return nil
 }
 
 func (r *retriever) downloadObject(hash string) (string, error) {
@@ -233,7 +286,7 @@ func (r *retriever) downloadObject(hash string) (string, error) {
 	logrus.Debugf("Requesting hash [%s]\n", hash)
 
 	path := fmt.Sprintf("objects/%s/%s", hash[:2], hash[2:40])
-	if _, err := r.downloadFile(path); err != nil {
+	if err := r.downloadFile(path); err != nil {
 		r.summary.MissingObjects = append(r.summary.MissingObjects, hash)
 		return "", err
 	}
@@ -342,15 +395,33 @@ func (r *retriever) checkout() error {
 
 var ErrNoPackInfo = fmt.Errorf("pack information (.git/objects/info/packs) is missing")
 
-func (r *retriever) handlePackFiles() error {
-	if _, err := r.downloadFile("objects/info/packs"); err != nil {
+// e.g. href="pack-5b89658fae4313c1e25d629bfa95f809c77ff949.pack"
+var packLinkRegex = regexp.MustCompile("href=[\"']?(pack-[a-z0-9]{40}\\.pack)")
+
+func (r *retriever) locatePackFiles() error {
+
+	// first of all let's try a directory listing for all pack files
+	_ = r.downloadFile("objects/pack/")
+
+	// otherwise hopefully the pak listing is available...
+	if err := r.downloadFile("objects/info/packs"); err != nil {
 		return ErrNoPackInfo
 	}
 
-	// TODO retrieve and unpack pack files...
-	// anything discovered should be removed from r.summary.MissingObjects and added to r.summary.FoundObjects
+	// after handling pack files, let's check if anything is still missing...
+	var newMissing []string
+	for _, hash := range r.summary.MissingObjects {
+		path := filepath.Join(r.outputDir, ".git", "objects", hash[:2], hash[2:40])
+		if _, err := os.Stat(path); err != nil {
+			newMissing = append(newMissing, hash)
+		} else {
+			r.summary.FoundObjects = append(r.summary.FoundObjects, hash)
+		}
+	}
 
-	return fmt.Errorf("unpacking pack files is not currently supported")
+	r.summary.MissingObjects = newMissing
+
+	return nil
 }
 
 func (r *retriever) Run() (*Summary, error) {
@@ -359,21 +430,21 @@ func (r *retriever) Run() (*Summary, error) {
 		return nil, err
 	}
 
-	if _, err := r.downloadFile("config"); err != nil {
+	if err := r.downloadFile("config"); err != nil {
 		return nil, err
 	}
 
-	if _, err := r.downloadFile("HEAD"); err != nil {
+	if err := r.downloadFile("HEAD"); err != nil {
 		return nil, err
 	}
 
 	// common paths to check, not necessarily required
 	for _, path := range paths {
-		_, _ = r.downloadFile(path)
+		_ = r.downloadFile(path)
 	}
 
 	// grab packed files
-	if err := r.handlePackFiles(); err == ErrNoPackInfo {
+	if err := r.locatePackFiles(); err == ErrNoPackInfo {
 		r.summary.PackInformationAvailable = false
 		logrus.Debugf("Pack information file is not available - some objects may be missing.")
 	} else if err == nil {

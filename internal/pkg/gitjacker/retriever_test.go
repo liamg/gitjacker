@@ -31,6 +31,20 @@ func newVulnerableServer() (*vulnerableServer, error) {
 		return nil, err
 	}
 
+	f, err := os.OpenFile(filepath.Join(dir, ".git", "config"), os.O_APPEND|os.O_WRONLY, os.ModePerm)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = f.Close() }()
+
+	if _, err := f.WriteString(`
+[user]
+	email = test@test.com
+	name = test
+`); err != nil {
+		return nil, err
+	}
+
 	fs := http.FileServer(http.Dir(dir))
 
 	return &vulnerableServer{
@@ -102,13 +116,17 @@ func TestRetrieval(t *testing.T) {
 	}
 	defer func() { _ = os.RemoveAll(outputDir) }()
 
-	if _, err := New(target, outputDir).Run(); err != nil {
+	summary, err := New(target, outputDir).Run()
+	if err != nil {
 		t.Fatal(err)
 	}
 
 	if _, err := os.Stat(filepath.Join(outputDir, "hello.php")); err != nil {
 		t.Fatal(err)
 	}
+
+	assert.Equal(t, summary.Config.User.Name, "test")
+	assert.Equal(t, summary.Config.User.Email, "test@test.com")
 
 	actual, err := ioutil.ReadFile(filepath.Join(outputDir, "hello.php"))
 	if err != nil {
