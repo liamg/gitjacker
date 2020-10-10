@@ -6,6 +6,8 @@ Gitjacker downloads git repositories and extracts their contents from sites wher
 
 For educational/penetration testing use only.
 
+More information at [https://liam-galvin.co.uk/security/2020/09/26/leaking-git-repos-from-misconfigured-sites.html](https://liam-galvin.co.uk/security/2020/09/26/leaking-git-repos-from-misconfigured-sites.html)
+
 ![Demo Gif](demo.gif)
 
 ## Installation
