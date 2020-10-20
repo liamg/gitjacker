@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"strings"
 	"time"
+    "crypto/tls"
 
 	"github.com/sirupsen/logrus"
 )
@@ -92,12 +93,15 @@ func New(target *url.URL, outputDir string) *retriever {
 
 	relative, _ := url.Parse(".git/")
 	target = target.ResolveReference(relative)
+    customTransport := http.DefaultTransport.(*http.Transport).Clone()
+    customTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 
 	return &retriever{
 		baseURL:   target,
 		outputDir: outputDir,
 		http: &http.Client{
 			Timeout: time.Second * 10,
+            Transport: customTransport,
 		},
 		downloaded: make(map[string]bool),
 		summary: Summary{
