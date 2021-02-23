@@ -95,6 +95,7 @@ func New(target *url.URL, outputDir string) *retriever {
 	target = target.ResolveReference(relative)
     customTransport := http.DefaultTransport.(*http.Transport).Clone()
     customTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+    customTransport.Proxy = http.ProxyFromEnvironment
 
 	return &retriever{
 		baseURL:   target,
