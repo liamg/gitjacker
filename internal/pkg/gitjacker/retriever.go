@@ -134,7 +134,7 @@ func (r *retriever) parsePackMetadata(meta []byte) error {
 	for _, line := range lines {
 		parts := strings.Split(strings.TrimSpace(line), " ")
 		if parts[0] == "P" && len(parts) == 2 {
-			packPath := filepath.Join(r.outputDir, ".git", "objects", "pack", filepath.FromSlash(filepath.Clean("/"+parts[1])))
+			packPath := filepath.Join("objects", "pack", filepath.FromSlash(filepath.Clean("/"+parts[1])))
 			if err := r.downloadFile(packPath); err != nil {
 				logrus.Debugf("Failed to retrieve pack file %s: %s", parts[1], err)
 			}
