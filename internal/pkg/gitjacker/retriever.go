@@ -160,7 +160,7 @@ func (r *retriever) downloadFile(path string) error {
 
 	path = strings.TrimSpace(path)
 
-	filePath := filepath.Join(r.outputDir, ".git", path)
+	filePath := filepath.Join(r.outputDir, ".git", filepath.FromSlash(filepath.Clean("/"+path)))
 
 	if r.downloaded[path] {
 		return nil
