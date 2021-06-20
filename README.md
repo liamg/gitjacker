@@ -19,3 +19,7 @@ curl -s "https://raw.githubusercontent.com/liamg/gitjacker/master/scripts/instal
 ...or grab a [precompiled binary](https://github.com/liamg/gitjacker/releases).
 
 You will need to have `git` installed to use Gitjacker.
+
+## In The News
+- 20/06/21: [Console 58](https://console.substack.com/p/console-58) - Awesome newsletter featuring tools and beta releases for developers.
+- 19/10/20: [ZDNet Article](https://www.zdnet.com/article/new-gitjacker-tool-lets-you-find-git-folders-exposed-online/) - *New Gitjacker tool lets you find .git folders exposed online*
