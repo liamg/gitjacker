@@ -29,7 +29,6 @@ var paths = []string{
 	"logs/refs/remotes/origin/HEAD",
 	"info/refs",
 	"info/exclude",
-	"packed-refs",
 }
 
 var ErrNotVulnerable = fmt.Errorf("no .git directory is available at this URL")
