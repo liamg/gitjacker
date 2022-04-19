@@ -3,6 +3,7 @@ package gitjacker
 import (
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -19,7 +20,6 @@ type vulnerableServer struct {
 }
 
 func newVulnerableServer() (*vulnerableServer, error) {
-
 	dir, err := ioutil.TempDir(os.TempDir(), "gjtest_server")
 	if err != nil {
 		return nil, err
@@ -50,14 +50,13 @@ func newVulnerableServer() (*vulnerableServer, error) {
 	return &vulnerableServer{
 		dir: dir,
 		server: &http.Server{
-			Addr:    "127.0.0.1:9999",
 			Handler: fs,
 		},
 	}, nil
 }
 
-func (v *vulnerableServer) Listen() error {
-	return v.server.ListenAndServe()
+func (v *vulnerableServer) Listen(listener net.Listener) error {
+	return v.server.Serve(listener)
 }
 
 func (v *vulnerableServer) Addr() string {
@@ -93,7 +92,12 @@ func TestRetrieval(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	go func() { _ = server.Listen() }()
+	listener, err := net.Listen("tcp", ":0")
+	if err != nil {
+		panic(err)
+	}
+
+	go func() { _ = server.Listen(listener) }()
 	defer func() { _ = server.Close() }()
 
 	expectedContent := "<?php\necho 'hello';\n"
@@ -105,7 +109,7 @@ func TestRetrieval(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	target, err := url.Parse(fmt.Sprintf("http://%s", server.Addr()))
+	target, err := url.Parse(fmt.Sprintf("http://127.0.0.1:%v", listener.Addr().(*net.TCPAddr).Port))
 	if err != nil {
 		t.Fatal(err)
 	}
