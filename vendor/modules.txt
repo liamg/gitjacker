@@ -25,5 +25,8 @@ golang.org/x/crypto/ssh/terminal
 # golang.org/x/sys v0.0.0-20190726091711-fc99dfbffb4e
 golang.org/x/sys/unix
 golang.org/x/sys/windows
+# golang.org/x/time v0.3.0
+## explicit
+golang.org/x/time/rate
 # gopkg.in/src-d/go-git.v4 v4.13.1
 ## explicit

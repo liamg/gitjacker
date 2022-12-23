@@ -1,6 +1,7 @@
 package gitjacker
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -14,6 +15,7 @@ import (
     "crypto/tls"
 
 	"github.com/sirupsen/logrus"
+	"golang.org/x/time/rate"
 )
 
 var paths = []string{
@@ -37,6 +39,7 @@ type retriever struct {
 	baseURL    *url.URL
 	outputDir  string
 	http       *http.Client
+	limiter    *rate.Limiter
 	downloaded map[string]bool
 	summary    Summary
 }
@@ -88,7 +91,7 @@ type Branch struct {
 	Remote string
 }
 
-func New(target *url.URL, outputDir string) *retriever {
+func New(target *url.URL, outputDir string, wait time.Duration) *retriever {
 
 	relative, _ := url.Parse(".git/")
 	target = target.ResolveReference(relative)
@@ -103,6 +106,7 @@ func New(target *url.URL, outputDir string) *retriever {
 			Timeout: time.Second * 10,
             Transport: customTransport,
 		},
+		limiter:    rate.NewLimiter(rate.Every(wait), 1),
 		downloaded: make(map[string]bool),
 		summary: Summary{
 			OutputDirectory: outputDir,
@@ -168,6 +172,11 @@ func (r *retriever) downloadFile(path string) error {
 	r.downloaded[path] = true
 
 	relative, err := url.Parse(path)
+	if err != nil {
+		return err
+	}
+
+	err = r.limiter.Wait(context.Background())
 	if err != nil {
 		return err
 	}

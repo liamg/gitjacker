@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/sirupsen/logrus"
 
@@ -19,11 +20,13 @@ import (
 
 var outputDir string
 var verbose bool
+var wait time.Duration
 
 func main() {
 
 	rootCmd.Flags().BoolVarP(&verbose, "verbose", "v", verbose, "Enable verbose logging")
 	rootCmd.Flags().StringVarP(&outputDir, "output-dir", "o", outputDir, "Directory to output retrieved git repository - defaults to a temporary directory")
+	rootCmd.Flags().DurationVarP(&wait, "wait", "w", wait, "Wait this long between HTTP requests (to avoid throttling)")
 
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
@@ -89,7 +92,7 @@ Output Dir: %s
 			_ = tml.Printf("\n<yellow>Gitjacking in progress...")
 		}
 
-		summary, err := gitjacker.New(u, outputDir).Run()
+		summary, err := gitjacker.New(u, outputDir, wait).Run()
 		if err != nil {
 			if !verbose {
 				fmt.Printf("\x1b[2K\r")
